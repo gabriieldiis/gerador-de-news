@@ -1,0 +1,859 @@
+<title>Gerador de News Kalunga</title>
+<style>
+/* Layout: padrão visual Kalunga.com (tema claro) — página branca, cards cinza #f6f6f6 arredondados, azul de marca #3c72b4, Segoe UI.
+   Duas colunas: briefing e campanha à esquerda; montagem, prévia, conferência e código à direita */
+:root{
+  color-scheme:light;
+  --page:#ffffff; --card:#f6f6f6; --field:#ffffff; --ink:#373a3c; --muted:#6c757d; --line:#dddddd; --line-strong:#6c757d;
+  --accent:#3c72b4; --accent-solid:#3c72b4; --accent-hover:#315f97; --accent-ink:#ffffff; --accent-soft:#e8eff8;
+  --inc-line:#e0b04a; --inc-bg:#fffdf6; --undo-bg:#373a3c; --drop-line:#b9c4d3; --placeholder:#9aa1a7;
+  --slot:#f6f6f6; --slot-line:#dddddd; --mail:#ffffff; --mail-head:#1f1a17; --mail-head-ink:#d9d4cf;
+  --warn:#8a5a00; --warn-bg:#fff4d6; --bad:#c0392b; --bad-bg:#fdecea; --ok:#2e7d4f; --ok-bg:#e6f4ec;
+  --f-body:"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --f-mono:Consolas, "SFMono-Regular", Menlo, "Courier New", monospace;
+  --r-card:14px; --r-ctl:6px;
+}
+/* modo escuro (escolhido no seletor do topo) */
+:root.dark{
+  color-scheme:dark;
+  --page:#121417; --card:#1b1e22; --field:#24282d; --ink:#e6e8ea; --muted:#a0a8b0; --line:#363b42; --line-strong:#6c757d;
+  --accent:#78a7e3; --accent-solid:#3c72b4; --accent-hover:#4a82c6; --accent-ink:#ffffff; --accent-soft:#22324a;
+  --slot:#1f2327; --slot-line:#3a4048; --mail:#181b1f; --mail-head:#0b0a09; --mail-head-ink:#cfc8c2;
+  --warn:#f0c46a; --warn-bg:#3a2e12; --bad:#ff8a7d; --bad-bg:#3e1a16; --ok:#7fd1a0; --ok-bg:#153222;
+  --inc-line:#a67c22; --inc-bg:#26221a; --undo-bg:#2e3338; --drop-line:#46505c; --placeholder:#6f7880;
+}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1380px;margin:0 auto;padding-inline:20px;padding-block:22px 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 20px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+h1{font-weight:700;font-size:26px;margin:0;color:var(--ink);text-wrap:balance}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);margin:0}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+section.panel{background:var(--card);border-radius:var(--r-card);padding:18px;min-width:0}
+h2{font-weight:700;font-size:17px;margin:0 0 14px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--ink)}
+h2 small{font-weight:400;color:var(--muted);font-size:12.5px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+input,select,textarea{font:inherit;font-weight:400;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:var(--r-ctl);padding:7px 10px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+button:focus-visible,.card:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input::placeholder{color:var(--placeholder)}
+.mono{font-family:var(--f-mono);font-size:12.5px}
+textarea#brief{min-height:330px;white-space:pre;overflow-x:auto;resize:vertical;font-family:var(--f-mono);font-size:12.5px;line-height:1.6}
+.hint{font-size:12px;color:var(--muted);margin:8px 0 0}
+.derived{display:flex;flex-direction:column;gap:6px;margin-top:14px;padding:12px;background:var(--field);border:1px solid var(--line);border-radius:var(--r-ctl)}
+.kv{display:flex;gap:8px;font-size:12px;align-items:baseline;min-width:0}
+.kv b{color:var(--muted);font-weight:600;flex:0 0 76px}
+.kv code{font-family:var(--f-mono);overflow-wrap:anywhere;min-width:0;color:var(--ink)}
+
+/* botões no padrão do site */
+button{font:inherit;cursor:pointer;border-radius:var(--r-ctl);border:1px solid var(--line);background:var(--field);color:var(--ink);padding:6px 12px;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.02em}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent-solid);color:var(--accent-ink);border-color:var(--accent-solid);font-weight:600;font-size:15px;text-transform:none;letter-spacing:0;padding:9px 22px}
+button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--accent-ink)}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:4px 4px;font-weight:400;font-size:13px;text-transform:none;letter-spacing:0;text-decoration:underline;text-underline-offset:2px}
+button.ghost:hover{color:var(--accent);border-color:transparent}
+button.danger{color:var(--bad);border-color:var(--bad);background:var(--field)}
+button.danger:hover{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.row-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* ---------- montagem ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.legend b{color:var(--ink);font-weight:700}
+.mail{background:var(--mail);border:1px solid var(--line);border-radius:10px;padding:14px 10px}
+.mail-inner{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.fixed{background:var(--mail-head);color:var(--mail-head-ink);font-size:11px;letter-spacing:.06em;text-transform:uppercase;text-align:center;padding:10px;border-radius:4px}
+#rows{display:flex;flex-direction:column;gap:8px}
+.lrow{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px}
+.lrow.incomplete{border-color:var(--inc-line);background:var(--inc-bg)}
+.lrow-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.handle{cursor:grab;display:flex;align-items:center;gap:6px;font-weight:700;color:var(--ink);user-select:none;padding:2px 4px;border-radius:4px}
+.handle:active{cursor:grabbing}
+.grip{font-family:var(--f-mono);letter-spacing:-2px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r-ctl);overflow:hidden;background:var(--field)}
+.seg button{border:0;border-radius:0;padding:3px 11px;font-size:13px;font-weight:400;text-transform:none;font-variant-numeric:tabular-nums;background:transparent;color:var(--accent)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button:hover{background:var(--accent-soft)}
+.seg button[aria-pressed="true"]{background:var(--accent-solid);color:var(--accent-ink);font-weight:700}
+.cap{margin-left:auto;font-variant-numeric:tabular-nums}
+.cap.warn{color:var(--warn);font-weight:700}
+.slots{display:grid;gap:8px;min-height:70px}
+.slots.c1{grid-template-columns:minmax(0,1fr)}
+.slots.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.slots.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.slots.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{position:relative;background:var(--slot);border:1px solid var(--slot-line);border-radius:10px;padding:9px 10px;cursor:grab;display:flex;flex-direction:column;gap:3px;min-width:0;min-height:78px;user-select:none;touch-action:manipulation}
+.card:hover{border-color:var(--accent)}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--field)}
+.card .n{font-weight:700;font-size:22px;line-height:1;color:var(--accent)}
+.card .t{font-size:12.5px;font-weight:600;line-height:1.3;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .term{font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .flags{position:absolute;top:9px;right:36px;display:flex;gap:4px}
+.card-del{position:absolute;top:5px;right:5px;width:24px;height:24px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--field);color:var(--muted);font-size:15px;font-weight:400;line-height:1;text-transform:none;opacity:0;transition:opacity .12s}
+.card:hover .card-del,.card:focus-within .card-del,.card.sel .card-del{opacity:1}
+.card-del:hover{color:var(--bad);border-color:var(--bad)}
+@media (hover:none){.card-del{opacity:1}}
+.row-del:hover{color:var(--bad)!important}
+.dot{width:9px;height:9px;border-radius:50%;background:#e0a21b}
+.dot.bad{background:var(--bad)}
+.ph{border:1.5px dashed var(--slot-line);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:var(--muted);min-height:78px;padding:6px;background:var(--field)}
+.sortable-ghost{opacity:.35}
+.sortable-chosen{cursor:grabbing}
+.sortable-drag{box-shadow:0 8px 24px rgba(55,58,60,.22)}
+.add-row{border:1.5px dashed var(--line);background:var(--field);color:var(--accent);padding:10px}
+.add-row:hover{border-color:var(--accent);background:var(--accent-soft)}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.card .thumb{display:block;width:100%;height:56px;object-fit:cover;border-radius:6px;margin-bottom:3px;background:var(--field)}
+
+#trash{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.undo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--undo-bg);color:#fff;border-radius:var(--r-ctl);padding:8px 12px;font-size:13px}
+.undo span{flex:1;min-width:0}
+.undo button{background:transparent;color:#fff;border-color:#fff;padding:4px 12px}
+.undo button:hover{color:#fff;border-color:#fff;background:rgba(255,255,255,.12)}
+.undo button.ghost{border-color:transparent;text-decoration:none}
+.removed{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted);background:var(--field);border:1px dashed var(--line);border-radius:var(--r-ctl);padding:8px 10px}
+.removed b{color:var(--ink)}
+.rm-item{display:inline-flex;align-items:center;gap:2px;background:var(--card);border-radius:var(--r-ctl);padding:2px 4px 2px 8px;min-width:0;max-width:100%}
+.rm-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;text-decoration:line-through}
+
+/* editor */
+.editor{margin-top:16px;border-top:1px solid var(--line);padding-top:16px}
+.editor-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.editor-head .n{font-weight:700;font-size:28px;color:var(--accent);line-height:1}
+.editor-head .file{font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow-wrap:anywhere;flex:1;min-width:0}
+.term-line{display:flex;gap:6px;align-items:center}
+.pill{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:99px;white-space:nowrap}
+.pill.auto{background:var(--accent-soft);color:var(--accent)}
+.pill.edit{background:var(--warn-bg);color:var(--warn)}
+.url{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.url a{color:var(--accent);font-family:var(--f-mono)}
+.note{font-size:12.5px;background:var(--warn-bg);color:var(--warn);border-radius:var(--r-ctl);padding:6px 9px}
+.editor .fields{grid-template-columns:1fr 1fr}
+@media (max-width:560px){.editor .fields{grid-template-columns:1fr}}
+
+/* pré-visualização */
+.pv-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.drop{border:1.5px dashed var(--drop-line);background:var(--field);border-radius:10px;padding:14px;text-align:center;font-size:13px;color:var(--muted);margin-bottom:12px;cursor:pointer}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop b{color:var(--accent)}
+.pv-stage{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px 8px;display:flex;justify-content:center;overflow-x:auto}
+#pv{border:0;width:100%;max-width:660px;height:600px;background:#f6f6f6;border-radius:4px;transition:max-width .2s}
+#pv.mobile{max-width:375px}
+
+/* conferência */
+.checks{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.checks li{font-size:13px;padding:8px 11px;border-radius:var(--r-ctl);display:flex;gap:8px;align-items:baseline}
+.checks li::before{font-weight:700;font-family:var(--f-mono)}
+.checks .ok{background:var(--ok-bg);color:var(--ok)} .checks .ok::before{content:"✓"}
+.checks .warn{background:var(--warn-bg);color:var(--warn)} .checks .warn::before{content:"!"}
+.checks .bad{background:var(--bad-bg);color:var(--bad)} .checks .bad::before{content:"×"}
+
+body,section.panel,.lrow,.card,input,select,textarea,.mail,.pv-stage{transition:background-color .2s,border-color .2s,color .2s}
+.theme-switch{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+textarea#out{background:var(--field);color:var(--ink);font-family:var(--f-mono);font-size:12px;line-height:1.5;min-height:360px;white-space:pre;overflow:auto;resize:vertical;tab-size:4}
+.toast{font-size:13px;color:var(--ok);font-weight:700;min-height:1em}
+@media (max-width:520px){.slots.c3,.slots.c4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script>try{ if (JSON.parse(localStorage.getItem('newsgen.theme')) === 'dark') document.documentElement.classList.add('dark'); }catch(e){}</script>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Gerador de News <span>Kalunga</span></h1>
+    <p class="sub">Cole o briefing, monte as linhas arrastando os banners e copie o HTML pronto.</p>
+    <div class="theme-switch">Tema
+      <span class="seg" role="group" aria-label="Tema da página">
+        <button type="button" id="th-light" aria-pressed="true">Claro</button>
+        <button type="button" id="th-dark" aria-pressed="false">Escuro</button>
+      </span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <h2>Campanha</h2>
+        <div class="fields">
+          <label>Data de envio<input type="date" id="cfg-date"></label>
+          <label>Extensão das imagens
+            <select id="cfg-ext"><option value="png">.png</option><option value="jpg">.jpg</option><option value="gif">.gif</option></select>
+          </label>
+          <label class="full">Segmento
+            <input id="cfg-seg" class="mono" list="seg-list" placeholder="seg_abriram_e_novos_cadastros_90d">
+            <datalist id="seg-list"><option value="seg_abriram_e_novos_cadastros_90d"></option></datalist>
+          </label>
+          <label class="full">utm_campaign (vazio = automático)<input id="cfg-camp" class="mono"></label>
+          <label class="full">Prefixo das imagens (vazio = automático)<input id="cfg-imgprefix" class="mono"></label>
+          <label class="full">Pasta das imagens<input id="cfg-imgbase" class="mono"></label>
+          <label class="full">Imagem de descrição (abaixo do menu)
+            <input id="cfg-desc" class="mono" spellcheck="false" placeholder="https://img.kalunga.com.br/…/descricao_10.jpg">
+            <span class="hint" style="margin:0;font-weight:400">Link completo da faixa que fica logo abaixo dos botões do app. Troque a cada news.</span>
+          </label>
+        </div>
+        <div class="derived">
+          <div class="kv"><b>Campanha</b><code id="d-camp"></code></div>
+          <div class="kv"><b>Imagens</b><code id="d-img"></code></div>
+          <div class="kv"><b>Validade</b><code id="d-val"></code></div>
+          <div class="kv"><b>Arquivo</b><code id="d-file"></code></div>
+          <div class="kv"><b>Descrição</b><code id="d-desc"></code></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Briefing <small>o mesmo texto enviado ao designer</small></h2>
+        <textarea id="brief" spellcheck="false" aria-label="Briefing"></textarea>
+        <p class="hint">Uma linha por banner: <code class="mono">Título - link</code> ou <code class="mono">Título - código</code>. Linha em branco separa blocos e define a montagem inicial. Texto entre parênteses vira nota para o designer.</p>
+        <div class="row-actions" style="margin-top:10px">
+          <button id="btn-sample" type="button">Carregar exemplo</button>
+          <button id="btn-clear" type="button" class="ghost">Limpar</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <h2>Montagem da news <small id="stats"></small></h2>
+        <div class="legend">
+          <span><b>Arraste</b> um banner para trocar de posição ou de linha</span>
+          <span><b>1 · 2 · 3 · 4</b> define quantos banners cabem na linha</span>
+          <span><b>⋮⋮</b> arrasta a linha inteira</span>
+          <span><b>Clique</b> no banner para editar</span>
+        </div>
+        <div class="mail">
+          <div class="mail-inner">
+            <div class="fixed">Cabeçalho · menu · app (fixos)</div>
+            <div id="rows"></div>
+            <button type="button" class="add-row" id="btn-add-row">+ Nova linha</button>
+            <div class="fixed">Serviços · redes sociais · texto legal (fixos)</div>
+          </div>
+        </div>
+        <div class="row-actions" style="margin-top:10px">
+          <button type="button" id="btn-relayout" class="ghost">Refazer montagem pelo briefing</button>
+        </div>
+        <div id="trash" hidden></div>
+        <div class="editor" id="editor"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Pré-visualização <small id="pv-count"></small></h2>
+        <div class="drop" id="drop" tabindex="0" role="button">
+          <b>Arraste as imagens exportadas aqui</b> ou clique para escolher.<br>
+          Cada arquivo entra no banner pelo número do nome (ex.: <span class="mono">mkt_…_03.png</span> vai para o banner 03).
+          <input type="file" id="files" accept="image/*" multiple hidden>
+        </div>
+        <div class="pv-bar">
+          <span class="seg" role="group" aria-label="Tamanho da prévia">
+            <button type="button" id="pv-desk" aria-pressed="true">Desktop</button>
+            <button type="button" id="pv-mob" aria-pressed="false">Celular</button>
+          </span>
+          <button type="button" class="ghost" id="pv-clear">Remover imagens</button>
+          <span class="hint" style="margin:0">Os links abrem em nova aba para você testar.</span>
+        </div>
+        <div class="pv-stage"><iframe id="pv" title="Pré-visualização da news" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+      </section>
+
+      <section class="panel">
+        <h2>Conferência</h2>
+        <ul class="checks" id="checks"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Código</h2>
+        <div class="row-actions" style="margin-bottom:10px">
+          <button id="btn-copy-full" class="primary" type="button">Copiar HTML completo</button>
+          <button id="btn-copy-body" type="button">Copiar só os blocos da news</button>
+          <span class="toast" id="toast" role="status"></span>
+        </div>
+        <textarea id="out" readonly spellcheck="false" aria-label="Código HTML gerado"></textarea>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+const TPL_HEAD="\u003c!DOCTYPE html>\n\u003chtml lang=\"pt-br\">\n\n\u003chead>\n\t\u003cmeta name=\"x-apple-disable-message-reformatting\" />\n\t\u003cmeta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n\t\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\t\u003ctitle>Kalunga.com\u003c/title>\n\t\u003cstyle type=\"text/css\">\n\t\t#outlook a {\n\t\t\tpadding: 0;\n\t\t}\n\n\t\tbody {\n\t\t\twidth: 100% !important;\n\t\t\t-webkit-text-size-adjust: 100%;\n\t\t\t-ms-text-size-adjust: 100%;\n\t\t\tmargin: 0;\n\t\t\tpadding: 0;\n\t\t\tbackground: #f6f6f6;\n\t\t}\n\n\t\timg {\n\t\t\toutline: none;\n\t\t\ttext-decoration: none;\n\t\t\tborder: none;\n\t\t\t-ms-interpolation-mode: bicubic;\n\t\t}\n\n\t\ta img {\n\t\t\tborder: none;\n\t\t}\n\n\t\t.image_fix {\n\t\t\tdisplay: block;\n\t\t}\n\n\t\tp {\n\t\t\tmargin: 0px 0px !important;\n\t\t}\n\n\t\ttable td {\n\t\t\tborder-collapse: collapse;\n\t\t}\n\n\t\ttable {\n\t\t\tborder-collapse: collapse;\n\t\t\tmso-table-space: 0pt;\n\t\t\tmso-table-space: 0pt;\n\t\t}\n\n\t\ttable[class=full] {\n\t\t\twidth: 100%;\n\t\t\tclear: both;\n\t\t}\n\n\t\timg[class=\"bigimage\"] {\n\t\t\twidth: 100% !important;\n\t\t\theight: auto !important;\n\t\t}\n\n\n\t\t@media only screen and (max-width: 640px) {\n\n\t\t\ttable[class=devicewidth] {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t\tborder-right: 0px solid #ffffff !important;\n\t\t\t\tmargin: 0 auto !important;\n\t\t\t}\n\n\t\t\ttable[class=devicewidthinner] {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t}\n\n\t\t\ttd[class=\"menu\"] {\n\t\t\t\ttext-align: center !important;\n\t\t\t\tpadding: 0 0 10px 0 !important;\n\t\t\t}\n\n\t\t\ttd[class=\"logo\"] {\n\t\t\t\tmargin: 0 auto !important;\n\t\t\t}\n\n\t\t\timg[class=\"logo\"] {\n\t\t\t\tmargin: 0 auto !important;\n\t\t\t}\n\n\t\t\ttd[class=oques] {\n\t\t\t\tfont-size: 11px !important;\n\t\t\t}\n\n\t\t\t.footer-content {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t}\n\t\t}\n\n\t\t@media only screen and (max-width: 480px) {\n\n\t\t\ttable[class=devicewidth] {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t\tborder-right: 0px solid #ffffff !important;\n\t\t\t\tmargin: 0 auto !important;\n\t\t\t}\n\n\t\t\ttable[class=devicewidthinner] {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t}\n\n\t\t\ttd[class=oques] {\n\t\t\t\tfont-size: 11px !important;\n\t\t\t}\n\n\t\t\t.footer-content {\n\t\t\t\twidth: 90% !important;\n\t\t\t\ttext-align: center !important;\n\t\t\t}\n\n\t\t}\n\t\u003c/style>\n\n\u003c/head>\n\n\u003cbody>\n\n\n\n\u003c!-- ABERTURA NEWS -->\n\n\u003ctable bgcolor=\"#f6f6f6\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" class=\"devicewidth\" style=\"width: 100%\">\n\t\u003ctbody>\n\t\t\u003ctr>\n\n\t\u003ctable width=\"607\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" class=\"devicewidth\" bgcolor=\"#f6f6f6\">\n\t\t\u003ctbody>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd width=\"100%\" height=\"10\" colspan=\"2\">\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd align=\"left\" valign=\"middle\"\n\t\t\t\t\tstyle=\"font-family: Tahoma, arial, sans-serif; font-size: 11px; color: #6a6a6a;\"\n\t\t\t\t\tst-content=\"preheader\">\u003cstrong>\u003c/strong>\u003c/td>\n\n\t\t\t\t\u003ctd align=\"right\" valign=\"bottom\"\n\t\t\t\t\tstyle=\"font-family: Tahoma, arial, sans-serif; font-size: 11px;color: #6a6a6a\"\n\t\t\t\t\tst-content=\"preheader\">\n\t\t\t\t\t\u003ca href=\"##preview##\" target=\"_blank\"\n\t\t\t\t\t\tstyle=\"font:11px Arial; color:#0ea4fb; height:18px; text-decoration:none\"> \u003cu>Ver\n\t\t\t\t\t\t\tOnline\u003c/u>&nbsp;&nbsp;\u003c/a>|\n\t\t\t\t\t\u003ca href=\"##optout##\" target=\"_blank\" style=\"color:#0ea4fb;\"> \u003cu>Descadastre-se\u003c/u>\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd width=\"100%\" height=\"10\" colspan=\"2\">\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\u003c/tbody>\n\t\u003c/table>\n\n\u003c!-- FIM DA ABERTURA -->\n\n\u003c!-- INÍCIO DO MENU -->\n\n\u003ctable width=\"607\" bgcolor=\"#1f1a17\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"\n\t\tclass=\"devicewidthinner\" hlitebg=\"edit\" shadow=\"edit\">\n\t\t\u003ctbody>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=KALUNGA\"\n\t\t\t\t\t\ttarget=\"_blank\">\u003cimg style=\"display:block;\"\n\t\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/head_01.jpg\" width=\"100%\" alt=\"Kalunga\"\n\t\t\t\t\t\t\tborder=\"0\" />\n\t\t\t\t\t\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\u003c/tbody>\n\t\u003c/table>\n\t\n\t\u003ctable width=\"607\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" class=\"devicewidthinner\">\n\t\t\u003ctbody>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/hotsite/aplicativo-smartphone?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=APP-KALUNGA\"\n\t\t\t\t\t\ttitle=\"Aplicativo Kalunga\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/app_01.jpg\"\n\t\t\t\t\t\t\talt=\"Aplicativo Kalunga\" width=\"100%\"\n\t\t\t\t\t\t\tstyle=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\t\u003ca href=\"https://play.google.com/store/apps/details?id=com.kalunga.app&pli=1?menuID=109&tipo=S&pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=GOOGLEPLAYSTORE\"\n\t\t\t\t\t\ttitle=\"Google Play Store\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/app_02.jpg\"\n\t\t\t\t\t\t\talt=\"Google Play Store\" width=\"100%\"\n\t\t\t\t\t\t\tstyle=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\t\u003ca href=\"https://apps.apple.com/app/kalunga/id467359104?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=APPSTORE\"\n\t\t\t\t\t\ttitle=\"App Store\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/app_03.jpg\"\n\t\t\t\t\t\t\talt=\"App Store\" width=\"100%\"\n\t\t\t\t\t\t\tstyle=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\u003c/tbody>\n\t\u003c/table>\n\n\t\u003ctable width=\"607\" bgcolor=\"#1f1a17\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"\n\t\tclass=\"devicewidthinner\" hlitebg=\"edit\" shadow=\"edit\">\n\t\t\u003ctbody>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=KALUNGA\"\n\t\t\t\t\t\ttarget=\"_blank\">\u003cimg style=\"display:block;\"\n\t\t\t\t\t\t\tsrc=\"{{DESC}}\" width=\"100%\" alt=\"Kalunga\"\n\t\t\t\t\t\t\tborder=\"0\" />\n\t\t\t\t\t\u003c/a>\n\t\t\t\t\u003c/td>\n\t\t\u003c/tbody>\n\t\u003c/table>\n\t\n\n\u003c!-- FIM DO MENU -->\n\n\u003c!-- INICIO DA NEWS -->";
+const TPL_FOOT="\u003c!-- FIM DA NEWS -->\n\n\u003c!-- RODAPÉ CLEAN -->\n\n\u003ctable width=\"607\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" class=\"devicewidthinner\">\n\t\u003ctbody>\n\t\t\u003ctr>\n\t\t\t\u003ctd align=\"center\"> \n\t\t\t\t\u003cimg src=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_01.png\" width=\"100%\" border=\"0\"\n\t\t\t\t\talt=\"Conheça nossos serviços\" style=\"display:block\" />\n\t\t\t\u003c/td>\n\t\t\u003c/tr>\n\t\u003c/tbody>\n\u003c/table>\n\n\u003ctable width=\"607\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" class=\"devicewidthinner\">\n\t\u003ctbody>\n\t\t\u003ctr>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/hotsite/click-e-retire?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=CLIQUE-RETIRE\"\n\t\t\t\t\ttitle=\"Clique e Retire\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_02.png\" alt=\"Clique e Retire\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/hotsite/entrega-super-expressa?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=ENTREGA-SUPER-EXPRESSA\"\n\t\t\t\t\ttitle=\"Entrega Super Expressa\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_03.png\" alt=\"Entrega Super Expressa\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.kalunga.com.br/hotsite/aplicativo-smartphone?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=APP-KALUNGA\"\n\t\t\t\t\ttitle=\"App Kalunga\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_04.png\" alt=\"App Kalunga\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\u003c/tr>\n\t\u003c/tbody>\n\u003c/table>\n\n\u003ctable width=\"607\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" class=\"devicewidthinner\">\n\t\u003ctbody>\n\t\t\u003ctr>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003cimg src=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_05.png\" alt=\"Acompanhe nossas redes sociais\"\n\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\tclass=\"bigimage\" />\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.facebook.com/kalungapontocom?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=FACEBOOK\"\n\t\t\t\t\ttitle=\"Facebook - Kalunga.com\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_06.png\" alt=\"Facebook - Kalunga.com\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.instagram.com/kalungacom/?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=INSTAGRAM\"\n\t\t\t\t\ttitle=\"Instagram - Kalunga.com\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_07.png\" alt=\"Instagram - Kalunga.com\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.linkedin.com/company/kalunga---papelaria-e-inform-tica/mycompany/?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=LINKEDIN\"\n\t\t\t\t\ttitle=\"Linkedin - Kalunga Papelaria e Informática\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_08.png\"\n\t\t\t\t\t\talt=\"Linkedin - Kalunga Papelaria e Informática\" width=\"100%\"\n\t\t\t\t\t\tstyle=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.tiktok.com/@kalungacom?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=TIKTOK\"\n\t\t\t\t\ttitle=\"Tiktok - Kalunga.com\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_09.png\" alt=\"Tiktok - Kalunga.com\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.youtube.com/user/LojasKalunga?sub_confirmation=1&pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=YOUTUBE\"\n\t\t\t\t\ttitle=\"Youtube - Kalunga.com\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/foot_10.png\" alt=\"Youtube - Kalunga.com\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\t\u003ctd align=\"center\">\n\t\t\t\t\u003ca href=\"https://www.whatsapp.com/channel/0029VbBf1tZ2f3EBkiGgY238?pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign={{CAMP}}&utm_term=WHATSAPP\"\n\t\t\t\t\ttitle=\"Canal de Transmissão Whatsapp - Kalunga.com\" target=\"_blank\">\u003cimg\n\t\t\t\t\t\tsrc=\"https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/icon-whatsapp.png\" alt=\"Whatsapp - Kalunga.com\"\n\t\t\t\t\t\twidth=\"100%\" style=\"display:block; border:none; outline:none; text-decoration:none;\"\n\t\t\t\t\t\tclass=\"bigimage\" />\u003c/a>\n\t\t\t\u003c/td>\n\t\t\u003c/tr>\n\t\u003c/tbody>\n\u003c/table>\n\u003cbr>\n\n\u003c!-- FIM RODAPÉ CLEAN -->\n\n\t\u003ctable width=\"607\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" class=\"devicewidth\" hlitebg=\"edit\"\n\t\tshadow=\"edit\">\n\t\t\u003ctbody>\n\t\t\t\u003ctr>\n\t\t\t\t\u003ctd>\n\n\t\t\t\t\t\u003ctable width=\"600\" class=\"footer-content\" align=\"center\" border=\"0\" cellpadding=\"0\"\n\t\t\t\t\t\tclass=\"devicewidthinner\">\n\t\t\t\t\t\t\u003ctr>\n\t\t\t\t\t\t\t\u003ctd width=\"100%\">\n\t\t\t\t\t\t\t\t\u003cfont face=\"tahoma\" size=\"2\">\n\t\t\t\t\t\t\t\t\t\u003cp style=\"font-size: 11px; font-family: tahoma; color: #333333; line-height: 17px; text-align: left; font-weight: normal;\">\n\t\t\t\t\t\t\t\t\t\tOfertas válidas para compras no site Kalunga.com até as 23h59 do dia \u003cb>{{VALIDADE}}\u003c/b> ou enquanto durarem os estoques. Sujeitas a alteração de preço, correção de informações, condições de pagamento e disponibilidade de estoque,\n\t\t\t\t\t\t\t\t\t\tsem aviso prévio. Este e-mail é automático e meramente informativo, favor não responder.\u003cbr />\n\t\t\t\t\t\t\t\t\t\t\u003cbr />\n\t\t\t\t\t\t\t\t\t\tAdicione nossos e-mails à sua lista de contatos para garantir que nossos comunicados cheguem à sua caixa de entrada:\u003cbr />\n\t\t\t\t\t\t\t\t\t\t\u003cstrong>news@emkt.kalunga.com.br\u003c/strong>\n\t\t\t\t\t\t\t\t\t\u003c/p>\n\t\t\t\t\t\t\t\t\u003c/font>\n\t\t\t\t\t\t\t\u003c/td>\n\t\t\t\t\t\t\u003c/tr>\n\t\t\t\t\t\t\u003ctr>\n\t\t\t\t\t\t\t\u003ctd>\n\t\t\t\t\t\t\t\t\u003cp\n\t\t\t\t\t\t\t\t\tstyle=\"font-size: 12px; font-family:tahoma; color: #333333; line-height: 17px; font-weight: normal; text-align: center\">\n\t\t\t\t\t\t\t\t\t\u003cbr />\n\t\t\t\t\t\t\t\t\t\u003cb> Caso não queira mais receber as ofertas da Kalunga.com,\n\t\t\t\t\t\t\t\t\t\t\u003ca href=\"##optout##\" target=\"_blank\" style=\"color:#0ea4fb;\"> \u003cu>remova\n\t\t\t\t\t\t\t\t\t\t\t\taqui\u003c/u>\u003c/a>\u003c/b>\n\t\t\t\t\t\t\t\t\u003c/p>\n\t\t\t\t\t\t\t\u003c/td>\n\t\t\t\t\t\t\u003c/tr>\n\t\t\t\t\t\t\u003ctr>\n\t\t\t\t\t\t\t\u003ctd height=\"30\">\n\n\t\t\t\t\t\t\t\u003c/td>\n\t\t\t\t\t\t\u003c/tr>\n\t\t\t\t\t\u003c/table>\n\n\n\t\t\t\t\u003c/td>\n\t\t\t\u003c/tr>\n\t\t\u003c/tbody>\n\t\u003c/table>\n\u003c/tr>\n\u003c/tbody>\n\u003c/table>\n\n\n\u003c/body>\n\n\u003c/html>";
+
+
+const SAMPLE = `Dia das Crianças - Compre no site e Retire na Loja em até 2h - https://www.kalunga.com.br/hotsite/dia-das-criancas
+
+Maletas e Kits para Colorir com até 30% OFF - https://www.kalunga.com.br/depto/escolar/maletas-kits-para-colorir/2/576
+Livros de Colorir com até 50% OFF - https://www.kalunga.com.br/busca/1?q=livro-colorir
+Kits e Massas de Modelar com até 50% OFF - https://www.kalunga.com.br/busca/1?q=massas-de-modelar (usar imagens Play Doh e Sunny)
+Volantes e Acessórios Logitech com até 20% OFF - https://www.kalunga.com.br/depto/gamers/volantes/13/1813
+
+Camisa Corinthians Retrô Infantil em até 3x sem juros - https://www.kalunga.com.br/busca/1?q=camisa-corinthians-infantil
+
+Pipoqueira e Sanduicheira Disney Stitch Mallory com 23% OFF - https://www.kalunga.com.br/busca/1?q=427850-427801
+Licenciados Playstation com até 29% OFF - https://www.kalunga.com.br/busca/1?q=playstation (não usar volante)
+Caixas de Som Bluetooth com até 39% OFF - https://www.kalunga.com.br/depto/informatica/caixas-de-som-bluetooth/1/1310
+Mochilas Infantis com até 30% OFF - https://www.kalunga.com.br/depto/escolar/mochila-escolar-infantil/2/1122
+
+672290`;
+
+const MESES_ARQ = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const MESES_TXT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const HOST_TERMS = {'kalungacopyprint.com.br':'COPY-E-PRINT','xsports.com.br':'XSPORTS','apps.apple.com':'APPSTORE','play.google.com':'GOOGLEPLAYSTORE'};
+const MAX_COLS = 4;
+
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('newsgen.'+k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('newsgen.'+k, JSON.stringify(v)); }catch(e){} }
+};
+function todayISO(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+const cfg = Object.assign({date: todayISO(), ext:'png', seg:'seg_abriram_e_novos_cadastros_90d', camp:'', imgprefix:'', imgbase:'https://img.kalunga.com.br/news/images/', desc:'https://img.kalunga.com.br/news/images/novos-news2/test-news-v9/images/descricao_10.jpg'}, store.get('cfg', {}));
+cfg.date = cfg.date || todayISO();
+let manual = store.get('manual', {});          // edições por banner
+let layout = store.get('layout', null);        // [{cap, keys:[]}]
+let briefOrder = store.get('briefOrder', []);
+let removed = store.get('removed', []);       // banners excluídos da montagem
+let undoSnap = null;                            // {layout, removed, msg}  // ordem das chaves na última leitura
+let items = {};                                 // chave -> banner lido do briefing
+let selected = null;
+let rowSeq = 0;
+
+/* ---------- regras ---------- */
+function parts(){ const [y,m,d] = cfg.date.split('-').map(Number); return {y, m, d}; }
+function campaign(){
+  if (cfg.camp.trim()) return cfg.camp.trim();
+  const {y,m,d} = parts();
+  return `${y}${String(m).padStart(2,'0')}${String(d).padStart(2,'0')}_${cfg.seg.trim()}_${y}`;
+}
+function imgPrefix(){
+  if (cfg.imgprefix.trim()) return cfg.imgprefix.trim();
+  const {y,m,d} = parts();
+  return `mkt_${y}${MESES_ARQ[m-1]}${String(d).padStart(2,'0')}_`;
+}
+function imgBase(){ let b = cfg.imgbase.trim(); return b && !b.endsWith('/') ? b + '/' : b; }
+function validade(){ const {y,m,d} = parts(); return `${d} de ${MESES_TXT[m-1]} de ${y}`; }
+
+function slug(s){
+  return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/&/g,' e ')
+    .toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+function cleanTitle(t){
+  return (t||'')
+    .replace(/\s+(com\s+)?(at[eé]\s+)?\d+([.,]\d+)?\s*%\s*(de\s+)?(OFF|desconto).*$/i,'')
+    .replace(/\s+em\s+at[eé]\s+\d+\s*x.*$/i,'')
+    .replace(/\s+(por|a partir de|de)\s+R\$.*$/i,'')
+    .replace(/\s+com\s+frete.*$/i,'')
+    .trim();
+}
+function deriveTerm(url, title){
+  let U; try{ U = new URL(url); }catch(e){ return slug(cleanTitle(title)); }
+  const host = U.hostname.replace(/^www\./,'');
+  if (!/(^|\.)kalunga\.com\.br$/.test(host)) return HOST_TERMS[host] || slug(cleanTitle(title)) || slug(host.split('.')[0]);
+  const path = U.pathname;
+  let m = path.match(/\/prod\/[^/]+\/(\d+)/); if (m) return m[1];
+  if (/^\/busca\//.test(path)){
+    const q = (U.searchParams.get('q')||'').trim();
+    if (/^\d+$/.test(q)) return q;
+    if (/^[\d\s,-]+$/.test(q)) return slug(cleanTitle(title)) || 'BUSCA';
+    return slug(q);
+  }
+  m = path.match(/\/hotsite\/([^/]+)/); if (m) return slug(m[1]);
+  const segs = path.split('/').filter(Boolean).filter(s => !/^\d+$/.test(s));
+  if (!segs.length) return 'KALUNGA';
+  return slug(segs[segs.length-1]) || slug(cleanTitle(title));
+}
+function trackUrl(url, term){
+  let [base, hash] = url.split('#');
+  const qi = base.indexOf('?');
+  if (qi >= 0){
+    const path = base.slice(0, qi);
+    const params = base.slice(qi+1).split(/[&?]/).filter(p => p && !/^(pcID|menuID|tipo|utm_[a-z]+)=/i.test(p));
+    base = params.length ? path + '?' + params.join('&') : path;
+  }
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}pcID=106&utm_source=News&utm_medium=E-mail&utm_campaign=${campaign()}&utm_term=${term}` + (hash ? '#'+hash : '');
+}
+const esc = s => String(s ?? '').replace(/&(?!amp;|#\d+;|[a-z]+;)/gi,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- leitura do briefing ---------- */
+const CODE_LINE = /^(?:(.*?)\s*[-–—:|]\s*)?(\d{4,8})(\s*\(([^)]*)\))?$/;
+function parseBrief(txt){
+  const groups = []; let group = []; const seen = {};
+  const flush = () => { if (group.length){ groups.push(group); group = []; } };
+  txt.replace(/\r/g,'').split('\n').forEach(raw => {
+    const t = raw.trim();
+    if (!t){ flush(); return; }
+    let title = '', url = '', notes = [], warn = '';
+    const um = t.match(/https?:\/\/[^\s)]+/);
+    if (um){
+      url = um[0].replace(/[.,;]+$/,'');
+      const before = t.slice(0, um.index).replace(/\s*[-–—:|]\s*$/,'').trim();
+      const after = t.slice(um.index + um[0].length).trim();
+      (before + ' ' + after).replace(/\(([^)]*)\)/g, (_, n) => { if (n.trim()) notes.push(n.trim()); return ''; });
+      title = before.replace(/\s*\([^)]*\)\s*/g,' ').trim();
+      const rest = after.replace(/\([^)]*\)/g,'').trim();
+      if (rest) notes.push(rest);
+    } else if (CODE_LINE.test(t)){
+      const cm = t.match(CODE_LINE);
+      url = 'https://www.kalunga.com.br/busca/1?q=' + cm[2];
+      title = (cm[1] || '').trim() || 'Produto ' + cm[2];
+      if (cm[4] && cm[4].trim()) notes.push(cm[4].trim());
+      if (!cm[1]) warn = 'Produto só com código: digite o nome do produto no título (alt).';
+    } else {
+      const last = group[group.length-1];
+      if (last){ last.notes.push(t); } else { group.push({title:t, url:'', notes:[], warn:'Linha sem link.'}); }
+      return;
+    }
+    group.push({title, url, notes, warn});
+  });
+  flush();
+  groups.forEach(g => g.forEach(it => {
+    const k0 = it.url || it.title;
+    seen[k0] = (seen[k0]||0) + 1;
+    it.key = k0 + '#' + seen[k0];
+  }));
+  return groups;
+}
+
+function defaultRows(group){
+  const keys = group.map(it => it.key), rows = [];
+  if (keys.length === 1) return [{cap:1, keys}];
+  for (let i = 0; i < keys.length; i += 2){
+    const chunk = keys.slice(i, i+2);
+    rows.push({cap: chunk.length, keys: chunk});
+  }
+  return rows;
+}
+
+function reconcile(groups, force){
+  const flat = groups.flat();
+  const newKeys = flat.map(it => it.key);
+  const newSet = new Set(newKeys), oldSet = new Set(briefOrder);
+  // link corrigido no briefing: mesma posição, chave nova -> mantém o lugar e as edições
+  const rename = {};
+  newKeys.forEach((k, i) => {
+    const old = briefOrder[i];
+    if (!oldSet.has(k) && old && !newSet.has(old)) rename[old] = k;
+  });
+  Object.entries(rename).forEach(([o, n]) => { if (manual[o]){ manual[n] = manual[o]; delete manual[o]; } if (selected === o) selected = n; });
+  removed = removed.map(k => rename[k] || k);
+  if (force){ removed = []; undoSnap = null; }
+  const isOut = k => removed.includes(k);
+
+  if (force || !Array.isArray(layout) || !layout.length){
+    layout = groups.flatMap(defaultRows);
+  } else {
+    layout = layout.map(r => ({cap: r.cap, keepEmpty: r.keepEmpty, keys: r.keys.map(k => rename[k] || k).filter(k => newSet.has(k) && !isOut(k))}))
+                   .filter(r => r.keys.length || r.keepEmpty);
+    const placed = new Set(layout.flatMap(r => r.keys));
+    groups.forEach(g => {
+      const missing = g.filter(it => !placed.has(it.key) && !isOut(it.key));
+      if (missing.length) layout.push(...defaultRows(missing));
+    });
+  }
+  items = {}; flat.forEach(it => items[it.key] = it);
+  briefOrder = newKeys;
+  removed = removed.filter(k => newSet.has(k));
+  if (selected && !items[selected]) selected = null;
+  saveLayout();
+}
+function saveLayout(){ store.set('removed', removed); store.set('layout', layout); store.set('briefOrder', briefOrder); store.set('manual', manual); }
+
+/* ---------- valores efetivos ---------- */
+function eff(key){
+  const it = items[key], m = manual[key] || {};
+  const termAuto = deriveTerm(it.url, it.title);
+  const termEdited = m.term != null && m.term !== '';
+  return { title: m.title != null ? m.title : it.title, term: termEdited ? m.term : termAuto, termAuto, termEdited, img: m.img || '' };
+}
+function order(){ return layout.flatMap(r => r.keys); }
+function imgFor(key){
+  const e = eff(key); if (e.img) return e.img;
+  const n = order().indexOf(key) + 1;
+  return `${imgBase()}${imgPrefix()}${String(n).padStart(2,'0')}.${cfg.ext}`;
+}
+function issues(key){
+  const it = items[key], e = eff(key), list = [];
+  if (!it.url) list.push(['bad','Sem link.']);
+  if (!e.term) list.push(['bad','Sem utm_term.']);
+  if (!e.title.trim()) list.push(['bad','Sem título/alt.']);
+  if (it.warn) list.push(['warn', it.warn]);
+  return list;
+}
+
+/* ---------- código ---------- */
+function cell(key){
+  const it = items[key], e = eff(key), alt = esc(e.title);
+  return `\t\t\t<td align="center">
+\t\t\t\t<a href="${trackUrl(it.url, e.term)}"
+\t\t\t\ttitle="${alt}" target="_blank"><img
+\t\t\t\tsrc="${imgFor(key)}"
+\t\t\t\talt="${alt}" width="100%"
+\t\t\t\tstyle="display:block; border:none; outline:none; text-decoration:none;"
+\t\t\t\tclass="bigimage" /></a>
+\t\t\t</td>`;
+}
+function bodyCode(){
+  return layout.filter(r => r.keys.length).map(r => `<table width="607" align="center" cellspacing="0" cellpadding="0" border="0" class="devicewidthinner">
+\t<tbody>
+\t\t<tr>
+${r.keys.map(cell).join('\n\n')}
+\t\t</tr>
+\t</tbody>
+</table>`).join('\n');
+}
+function fullCode(){
+  const camp = campaign();
+  return TPL_HEAD.split('{{CAMP}}').join(camp).split('{{DESC}}').join(cfg.desc.trim()) + '\n\n' + bodyCode() + '\n\n' + TPL_FOOT.split('{{CAMP}}').join(camp).split('{{VALIDADE}}').join(validade());
+}
+
+/* ---------- montagem visual ---------- */
+let sortables = [];
+function renderRows(){
+  sortables.forEach(s => s.destroy()); sortables = [];
+  const el = $('#rows');
+  const nItems = order().length;
+  if (!layout.length){ el.innerHTML = '<div class="empty">Cole o briefing ao lado para montar a news.</div>'; $('#stats').textContent = ''; return; }
+  el.innerHTML = layout.map((r, ri) => {
+    const filled = r.keys.length, incomplete = filled > 0 && filled < r.cap;
+    const segBtns = Array.from({length: MAX_COLS}, (_, i) => `<button type="button" data-cap="${i+1}" aria-pressed="${r.cap === i+1}" aria-label="${i+1} por linha">${i+1}</button>`).join('');
+    const cards = r.keys.map(k => {
+      const e = eff(k), iss = issues(k), n = order().indexOf(k) + 1, it = items[k];
+      const flags = (iss.length ? `<span class="dot${iss.some(i => i[0]==='bad') ? ' bad' : ''}" title="${esc(iss.map(i=>i[1]).join(' '))}"></span>` : '') +
+                    (it.notes.length ? `<span class="dot" style="background:var(--accent)" title="Nota para o designer"></span>` : '');
+      return `<div class="card${selected === k ? ' sel' : ''}" data-k="${esc(k)}" tabindex="0" role="button" aria-label="Banner ${n}: ${esc(e.title)}">
+        <span class="flags">${flags}</span>
+        <button type="button" class="card-del" data-rm="${esc(k)}" title="Remover banner" aria-label="Remover banner ${n}">×</button>
+        ${uploads[k] ? `<img class="thumb" src="${uploads[k].url}" alt="">` : ''}
+        <span class="n">${String(n).padStart(2,'0')}</span>
+        <span class="t">${esc(e.title) || '<i>sem título</i>'}</span>
+        <span class="term">${esc(e.term)}</span>
+      </div>`;
+    }).join('');
+    const phs = Array.from({length: Math.max(0, r.cap - filled)}, () => `<div class="ph">${filled ? 'Espaço livre' : 'Arraste um banner aqui'}</div>`).join('');
+    return `<div class="lrow${incomplete ? ' incomplete' : ''}" data-r="${ri}">
+      <div class="lrow-bar">
+        <span class="handle" title="Arraste para mover a linha"><span class="grip">⋮⋮</span>Linha ${ri+1}</span>
+        <span class="seg" role="group" aria-label="Banners nesta linha">${segBtns}</span>
+        <span class="cap${incomplete ? ' warn' : ''}">${filled} de ${r.cap}</span>
+        <button type="button" class="ghost row-del" data-del="${ri}" title="${filled ? 'Excluir a linha e os banners dela' : 'Excluir linha vazia'}">Excluir linha</button>
+      </div>
+      <div class="slots c${r.cap}" data-r="${ri}" data-cap="${r.cap}">${cards}${phs}</div>
+    </div>`;
+  }).join('');
+  $('#stats').textContent = `${nItems} banners · ${layout.filter(r => r.keys.length).length} linhas`;
+
+  el.querySelectorAll('.slots').forEach(list => {
+    sortables.push(Sortable.create(list, {
+      group: { name: 'banners', put: to => to.el.querySelectorAll('.card').length < +to.el.dataset.cap },
+      draggable: '.card', filter: '.card-del', preventOnFilter: false, animation: 150, delay: 120, delayOnTouchOnly: true,
+      ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen', dragClass: 'sortable-drag',
+      emptyInsertThreshold: 20,
+      onEnd: () => setTimeout(syncFromDOM, 0)
+    }));
+  });
+  sortables.push(Sortable.create(el, {
+    handle: '.handle', draggable: '.lrow', animation: 150,
+    onEnd: () => setTimeout(syncFromDOM, 0)
+  }));
+}
+function syncFromDOM(){
+  layout = [...document.querySelectorAll('#rows .lrow')].map(r => {
+    const list = r.querySelector('.slots');
+    return { cap: +list.dataset.cap, keys: [...list.querySelectorAll('.card')].map(c => c.dataset.k), keepEmpty: true };
+  });
+  saveLayout(); renderAll();
+}
+
+function renderEditor(){
+  const el = $('#editor');
+  if (!selected || !items[selected]){ el.innerHTML = '<p class="hint" style="margin:0">Clique em um banner para editar título, utm_term ou imagem.</p>'; return; }
+  const k = selected, it = items[k], e = eff(k), flat = order(), pos = flat.indexOf(k);
+  el.innerHTML = `<div class="editor-head">
+      <span class="n">${String(pos+1).padStart(2,'0')}</span>
+      <span class="file" id="ed-file">${esc(imgFor(k))}</span>
+      <button type="button" data-move="-1" ${pos === 0 ? 'disabled' : ''} title="Trocar com o anterior">← Antes</button>
+      <button type="button" data-move="1" ${pos === flat.length-1 ? 'disabled' : ''} title="Trocar com o próximo">Depois →</button>
+      <button type="button" class="danger" data-remove>Remover banner</button>
+      <button type="button" class="ghost" data-close>Fechar</button>
+    </div>
+    <div class="fields">
+      <label class="full">Título / alt<input id="ed-title" value="${esc(e.title)}"></label>
+      <label>utm_term<span class="term-line"><input id="ed-term" class="mono" value="${esc(e.term)}" placeholder="${esc(e.termAuto)}">
+        <span class="pill ${e.termEdited ? 'edit' : 'auto'}" id="ed-pill">${e.termEdited ? 'editado' : 'auto'}</span>
+        <button type="button" class="ghost" id="ed-reset" title="Voltar ao automático" ${e.termEdited ? '' : 'hidden'}>↺</button></span></label>
+      <label>Outra imagem (opcional)<input id="ed-img" class="mono" value="${esc(e.img)}" placeholder="URL completa da imagem"></label>
+      <div class="full url">Link: ${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.url)}</a>` : '<b>sem link</b>'} <span style="font-family:var(--f-body)">(edite no briefing)</span></div>
+      ${it.notes.map(n => `<div class="full note">Nota para o designer: ${esc(n)}</div>`).join('')}
+      ${it.warn ? `<div class="full note">${esc(it.warn)}</div>` : ''}
+    </div>`;
+}
+
+function renderChecks(){
+  const list = [], flat = order();
+  if (!flat.length){ $('#checks').innerHTML = '<li class="warn">Nenhum banner lido do briefing ainda.</li>'; return; }
+  layout.forEach((r, i) => {
+    if (!r.keys.length) list.push(['warn', `Linha ${i+1} está vazia. Ela não entra no código.`]);
+    else if (r.keys.length < r.cap) list.push(['warn', `Linha ${i+1} tem ${r.keys.length} de ${r.cap} banners. No código, ${r.keys.length === 1 ? 'o banner ocupa a linha toda' : 'os banners dividem a linha'}.`]);
+  });
+  flat.forEach((k, i) => issues(k).forEach(([c, t]) => list.push([c, `Banner ${i+1}: ${t}`])));
+  const terms = {};
+  flat.forEach((k, i) => { const t = eff(k).term; (terms[t] = terms[t] || []).push(i+1); });
+  Object.entries(terms).forEach(([t, ids]) => { if (t && ids.length > 1) list.push(['warn', `utm_term ${t} repetido nos banners ${ids.join(', ')}.`]); });
+  flat.forEach((k, i) => { const u = items[k].url; if (!u) return; try{ const h = new URL(u).hostname; if (!/kalunga\.com\.br$/.test(h)) list.push(['warn', `Banner ${i+1} leva para fora do site (${h}).`]); }catch(e){ list.push(['bad', `Banner ${i+1}: link inválido.`]); } });
+  flat.forEach((k, i) => { if (/\?[^#]*\?/.test(items[k].url)) list.push(['warn', `Banner ${i+1}: o link tinha dois "?". Corrigi no código gerado.`]); });
+  const up = Object.keys(uploads).filter(k => items[k]);
+  if (up.length){
+    flat.forEach((k, i) => {
+      const u = uploads[k]; if (!u) return;
+      const expected = imgFor(k).split('/').pop();
+      if (u.name !== expected) list.push(['warn', `Banner ${i+1}: a imagem enviada é ${u.name}, mas o código usa ${expected}. Renomeie o arquivo antes de subir.`]);
+    });
+    const missing = flat.map((k, i) => uploads[k] ? null : i+1).filter(Boolean);
+    if (missing.length) list.push(['warn', `Sem imagem na prévia: banner${missing.length > 1 ? 's' : ''} ${missing.join(', ')}.`]);
+  }
+  const ss = serverStats();
+  if (ss.ok && ss.fail.length) list.push(['warn', `Imagem não encontrada no servidor: banner${ss.fail.length > 1 ? 's' : ''} ${ss.fail.join(', ')}. Confira se já subiu e se o nome está certo.`]);
+  if (orphanFiles.length) list.push(['warn', `Não encontrei banner para: ${orphanFiles.join(', ')}.`]);
+  const notes = flat.reduce((n, k) => n + items[k].notes.length, 0);
+  if (notes) list.push(['warn', `${notes} nota(s) para o designer. Elas não entram no código.`]);
+  if (!cfg.seg.trim() && !cfg.camp.trim()) list.push(['bad', 'Preencha o segmento ou a utm_campaign.']);
+  if (!cfg.desc.trim()) list.push(['bad', 'Preencha o link da imagem de descrição (abaixo do menu).']);
+  else if (!/^https?:\/\/\S+$/.test(cfg.desc.trim())) list.push(['warn', 'O link da imagem de descrição não parece um endereço completo (https://…).']);
+  else if (imgStatus[cfg.desc.trim()] === 'fail' && serverStats().ok) list.push(['warn', 'A imagem de descrição não foi encontrada no servidor. Confira o link.']);
+  if (!list.some(l => l[0] === 'bad')) list.unshift(['ok', `${flat.length} banners em ${layout.filter(r => r.keys.length).length} linhas, imagens ${imgPrefix()}01 a ${String(flat.length).padStart(2,'0')}.${cfg.ext}.`]);
+  $('#checks').innerHTML = list.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
+}
+
+function renderDerived(){
+  $('#cfg-camp').placeholder = campaign();
+  $('#cfg-imgprefix').placeholder = imgPrefix();
+  $('#d-camp').textContent = campaign();
+  $('#d-img').textContent = imgBase() + imgPrefix() + '01.' + cfg.ext;
+  $('#d-val').textContent = validade();
+  $('#d-file').textContent = 'mkt_' + campaign() + '.html';
+  $('#d-desc').textContent = cfg.desc.trim().split('/').pop() || '—';
+}
+function renderCode(){ $('#out').value = fullCode(); schedulePreview(); }
+function renderAll(){ renderDerived(); renderRows(); renderEditor(); renderChecks(); renderCode(); renderTrash(); }
+function renderAfterEdit(){ renderRows(); renderChecks(); renderCode(); const f = $('#ed-file'); if (f && selected) f.textContent = imgFor(selected); }
+
+/* ---------- pré-visualização ---------- */
+let uploads = {};        // chave do banner -> {name, url}
+let orphanFiles = [];
+const xml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function placeholder(w, h, label, sub, dark){
+  const words = String(label).split(/\s+/), lines = []; let cur = '';
+  const maxc = Math.max(10, Math.round(w / 11));
+  words.forEach(wd => { if ((cur + ' ' + wd).trim().length > maxc){ if (cur) lines.push(cur); cur = wd; } else cur = (cur + ' ' + wd).trim(); });
+  if (cur) lines.push(cur);
+  const shown = lines.slice(0, 4), fs = 18, y0 = h/2 - (shown.length-1) * fs * .65 + (sub ? -8 : 0);
+  const bg = dark ? '#2b2522' : '#e4ebf6', fg = dark ? '#d9d4cf' : '#2a3a5c', st = dark ? '#3d3532' : '#b9c6dc';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${bg}"/><rect x="4" y="4" width="${w-8}" height="${h-8}" fill="none" stroke="${st}" stroke-dasharray="6 5" stroke-width="2"/>` +
+    shown.map((l, i) => `<text x="${w/2}" y="${y0 + i*fs*1.3}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${fs}" font-weight="700" fill="${fg}">${xml(l)}</text>`).join('') +
+    (sub ? `<text x="${w/2}" y="${y0 + shown.length*fs*1.3 + 6}" text-anchor="middle" font-family="monospace" font-size="12" fill="${fg}" opacity=".7">${xml(sub)}</text>` : '') + `</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const SIZES = {1:[607,220], 2:[303,300], 3:[202,250], 4:[151,220]};
+function previewHTML(){
+  const bySrc = {};
+  layout.forEach(r => r.keys.forEach(k => { bySrc[imgFor(k)] = {k, cap: r.keys.length}; }));
+  return fullCode().replace(/<img([^>]*?)src="([^"]+)"([^>]*)>/g, (all, a, src, b) => {
+    const alt = ((a + b).match(/alt="([^"]*)"/) || [,''])[1].replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+    const hit = bySrc[src];
+    if (!(hit && uploads[hit.k])){
+      const st = probe(src);
+      if (st === 'ok') return all;   // imagem real carregou do servidor
+    }
+    if (hit){
+      if (uploads[hit.k]) return `<img${a}src="${uploads[hit.k].url}"${b}>`;
+      const [w, h] = SIZES[hit.cap] || SIZES[1];
+      return `<img${a}src="${placeholder(w, h, alt, src.split('/').pop())}"${b}>`;
+    }
+    // imagens fixas do cabeçalho e rodapé
+    const name = src.split('/').pop();
+    const h = /head_01/.test(name) ? 70 : /descricao/.test(name) ? 44 : /foot_01/.test(name) ? 40 : 56;
+    return `<img${a}src="${placeholder(600, h, alt || name, '', true)}"${b}>`;
+  });
+}
+const imgStatus = {};   // src -> 'pending' | 'ok' | 'fail'
+function probe(src){
+  if (imgStatus[src]) return imgStatus[src];
+  if (!/^https?:/.test(src)){ imgStatus[src] = 'fail'; return 'fail'; }
+  imgStatus[src] = 'pending';
+  const im = new Image();
+  const done = st => { if (imgStatus[src] !== 'pending') return; imgStatus[src] = st; schedulePreview(); renderChecks(); };
+  im.onload = () => done(im.naturalWidth > 0 ? 'ok' : 'fail');
+  im.onerror = () => done('fail');
+  setTimeout(() => done('fail'), 8000);
+  im.src = src;
+  return 'pending';
+}
+function serverStats(){
+  const flat = order();
+  const ok = flat.filter(k => !uploads[k] && imgStatus[imgFor(k)] === 'ok').length;
+  const fail = flat.map((k, i) => (!uploads[k] && imgStatus[imgFor(k)] === 'fail') ? i+1 : null).filter(Boolean);
+  return {ok, fail};
+}
+let pvT;
+function schedulePreview(){ clearTimeout(pvT); pvT = setTimeout(renderPreview, 250); }
+function renderPreview(){
+  const f = $('#pv');
+  const y = f.contentWindow ? f.contentWindow.scrollY : 0;
+  f.onload = () => {
+    try{ const d = f.contentDocument; f.style.height = Math.max(400, d.documentElement.scrollHeight + 4) + 'px'; f.contentWindow.scrollTo(0, y); }catch(e){}
+  };
+  f.srcdoc = previewHTML();
+  const n = Object.keys(uploads).filter(k => items[k]).length, s = serverStats(), total = order().length;
+  const partsTxt = [];
+  if (s.ok) partsTxt.push(`${s.ok} do servidor`);
+  if (n) partsTxt.push(`${n} enviada${n > 1 ? 's' : ''} aqui`);
+  const missing = total - s.ok - n;
+  if (missing > 0) partsTxt.push(`${missing} com espaço reservado`);
+  $('#pv-count').textContent = partsTxt.join(' · ');
+}
+function addFiles(fileList){
+  const files = [...fileList].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  const flat = order();
+  Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res({name: f.name, url: r.result}); r.onerror = () => res(null); r.readAsDataURL(f); })))
+    .then(list => {
+      orphanFiles = [];
+      list.filter(Boolean).forEach(f => {
+        let key = flat.find(k => imgFor(k).split('/').pop() === f.name);
+        if (!key){ const m = f.name.match(/(\d+)\.[a-z0-9]+$/i); if (m) key = flat[+m[1] - 1]; }
+        if (key) uploads[key] = f; else orphanFiles.push(f.name);
+      });
+      renderAll();
+    });
+}
+const drop = $('#drop'), fileInput = $('#files');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); fileInput.click(); } });
+fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, ev => { if ([...(ev.dataTransfer?.types||[])].includes('Files')){ ev.preventDefault(); drop.classList.add('over'); } }));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, () => drop.classList.remove('over')));
+drop.addEventListener('drop', ev => { ev.preventDefault(); addFiles(ev.dataTransfer.files); });
+$('#pv-desk').addEventListener('click', () => { $('#pv').classList.remove('mobile'); $('#pv-desk').setAttribute('aria-pressed','true'); $('#pv-mob').setAttribute('aria-pressed','false'); schedulePreview(); });
+$('#pv-mob').addEventListener('click', () => { $('#pv').classList.add('mobile'); $('#pv-mob').setAttribute('aria-pressed','true'); $('#pv-desk').setAttribute('aria-pressed','false'); schedulePreview(); });
+$('#pv-clear').addEventListener('click', () => { uploads = {}; orphanFiles = []; renderAll(); });
+
+function reparse(force){ reconcile(parseBrief($('#brief').value), force); store.set('brief', $('#brief').value); renderAll(); }
+
+/* ---------- eventos ---------- */
+const cfgMap = {date:'#cfg-date', ext:'#cfg-ext', seg:'#cfg-seg', camp:'#cfg-camp', imgprefix:'#cfg-imgprefix', imgbase:'#cfg-imgbase', desc:'#cfg-desc'};
+Object.entries(cfgMap).forEach(([k, sel]) => {
+  const el = $(sel); el.value = cfg[k];
+  el.addEventListener('input', () => { cfg[k] = el.value; if (k === 'date' && !el.value) cfg.date = todayISO(); store.set('cfg', cfg); renderDerived(); renderAfterEdit(); });
+});
+
+let tmr; $('#brief').addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(() => reparse(false), 250); });
+$('#btn-sample').addEventListener('click', () => { $('#brief').value = SAMPLE; manual = {}; reparse(true); });
+$('#btn-clear').addEventListener('click', () => { $('#brief').value = ''; manual = {}; selected = null; reparse(true); $('#brief').focus(); });
+$('#btn-relayout').addEventListener('click', () => reparse(true));
+function snapshot(msg){ undoSnap = {layout: JSON.parse(JSON.stringify(layout)), removed: removed.slice(), msg}; }
+function bannerLabel(k){ const n = order().indexOf(k) + 1; return `Banner ${String(n).padStart(2,'0')}`; }
+function removeItem(k){
+  if (!k || !items[k]) return;
+  snapshot(`${bannerLabel(k)} removido.`);
+  layout.forEach(r => { r.keys = r.keys.filter(x => x !== k); });
+  layout = layout.filter(r => r.keys.length || r.keepEmpty);
+  removed.push(k);
+  if (selected === k) selected = null;
+  saveLayout(); renderAll();
+}
+function removeRow(ri){
+  const row = layout[ri]; if (!row) return;
+  snapshot(row.keys.length ? `Linha ${ri+1} removida com ${row.keys.length} banner${row.keys.length > 1 ? 's' : ''}.` : `Linha ${ri+1} removida.`);
+  removed.push(...row.keys);
+  if (row.keys.includes(selected)) selected = null;
+  layout.splice(ri, 1);
+  saveLayout(); renderAll();
+}
+function renderTrash(){
+  const el = $('#trash');
+  const list = removed.filter(k => items[k]);
+  let html = '';
+  if (undoSnap) html += `<div class="undo" role="status"><span>${esc(undoSnap.msg)}</span><button type="button" data-undo>Desfazer</button><button type="button" class="ghost" data-undo-close aria-label="Fechar aviso">×</button></div>`;
+  if (list.length) html += `<div class="removed"><b>Removidos (${list.length})</b>${list.map(k => `<span class="rm-item"><span class="rm-t">${esc(eff(k).title) || 'sem título'}</span><button type="button" class="ghost" data-restore="${esc(k)}">Restaurar</button></span>`).join('')}</div>`;
+  el.innerHTML = html; el.hidden = !html;
+}
+$('#trash').addEventListener('click', ev => {
+  if (ev.target.closest('[data-undo]')){ layout = undoSnap.layout; removed = undoSnap.removed; undoSnap = null; saveLayout(); renderAll(); return; }
+  if (ev.target.closest('[data-undo-close]')){ undoSnap = null; renderTrash(); return; }
+  const rs = ev.target.closest('[data-restore]');
+  if (rs){ const k = rs.dataset.restore; removed = removed.filter(x => x !== k); layout.push({cap: 1, keys: [k]}); undoSnap = null; saveLayout(); renderAll(); }
+});
+$('#btn-add-row').addEventListener('click', () => { layout.push({cap: 2, keys: [], keepEmpty: true}); saveLayout(); renderAll(); });
+
+$('#rows').addEventListener('click', ev => {
+  const capBtn = ev.target.closest('[data-cap]');
+  if (capBtn && capBtn.tagName === 'BUTTON'){
+    const ri = +capBtn.closest('.lrow').dataset.r, cap = +capBtn.dataset.cap, row = layout[ri];
+    row.cap = cap;
+    if (row.keys.length > cap){ const extra = row.keys.splice(cap); layout.splice(ri+1, 0, {cap: Math.min(MAX_COLS, extra.length), keys: extra}); }
+    saveLayout(); renderAll(); return;
+  }
+  const rm = ev.target.closest('[data-rm]');
+  if (rm){ ev.stopPropagation(); removeItem(rm.dataset.rm); return; }
+  const del = ev.target.closest('[data-del]');
+  if (del){ removeRow(+del.dataset.del); return; }
+  const card = ev.target.closest('.card');
+  if (card){ selected = selected === card.dataset.k ? null : card.dataset.k; renderRows(); renderEditor(); }
+});
+$('#rows').addEventListener('keydown', ev => {
+  const card = ev.target.closest('.card');
+  if (ev.target.tagName === 'BUTTON') return;
+  if (card && (ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); selected = card.dataset.k; renderRows(); renderEditor(); $('#ed-title')?.focus(); }
+});
+
+$('#editor').addEventListener('input', ev => {
+  if (!selected) return;
+  const m = manual[selected] = manual[selected] || {};
+  if (ev.target.id === 'ed-title') m.title = ev.target.value;
+  if (ev.target.id === 'ed-img') m.img = ev.target.value.trim();
+  if (ev.target.id === 'ed-term'){
+    const v = ev.target.value.trim().toUpperCase().replace(/\s+/g,'-');
+    m.term = v || null;
+    const ed = !!v; $('#ed-pill').className = 'pill ' + (ed ? 'edit' : 'auto'); $('#ed-pill').textContent = ed ? 'editado' : 'auto'; $('#ed-reset').hidden = !ed;
+  }
+  saveLayout(); renderAfterEdit();
+});
+$('#editor').addEventListener('click', ev => {
+  if (ev.target.closest('[data-close]')){ selected = null; renderRows(); renderEditor(); return; }
+  if (ev.target.closest('[data-remove]')){ removeItem(selected); return; }
+  if (ev.target.id === 'ed-reset'){ (manual[selected] = manual[selected] || {}).term = null; saveLayout(); renderAll(); return; }
+  const mv = ev.target.closest('[data-move]');
+  if (mv){
+    const flat = order(), i = flat.indexOf(selected), j = i + +mv.dataset.move;
+    if (j < 0 || j >= flat.length) return;
+    const swap = flat[j];
+    layout.forEach(r => { r.keys = r.keys.map(k => k === selected ? swap : k === swap ? selected : k); });
+    saveLayout(); renderAll();
+  }
+});
+
+function copy(text, msg){
+  const done = () => { $('#toast').textContent = msg; setTimeout(() => $('#toast').textContent = '', 2500); };
+  const fallback = () => { const o = $('#out'); o.focus(); o.select(); $('#toast').textContent = 'Texto selecionado. Use Ctrl+C para copiar.'; };
+  try{ navigator.clipboard.writeText(text).then(done, fallback); }catch(e){ fallback(); }
+}
+$('#btn-copy-full').addEventListener('click', () => copy(fullCode(), 'HTML completo copiado.'));
+$('#btn-copy-body').addEventListener('click', () => copy(bodyCode(), 'Blocos da news copiados.'));
+
+function setTheme(t){
+  document.documentElement.classList.toggle('dark', t === 'dark');
+  $('#th-light').setAttribute('aria-pressed', String(t !== 'dark'));
+  $('#th-dark').setAttribute('aria-pressed', String(t === 'dark'));
+  store.set('theme', t);
+}
+$('#th-light').addEventListener('click', () => setTheme('light'));
+$('#th-dark').addEventListener('click', () => setTheme('dark'));
+setTheme(store.get('theme', 'light'));
+
+if (!window.Sortable){ window.Sortable = { create: () => ({ destroy(){} }) }; }
+$('#brief').value = store.get('brief', null) ?? SAMPLE;
+reparse(false);
+</script>
